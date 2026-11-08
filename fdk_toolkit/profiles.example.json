@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "blender": "C:/Program Files/Blender Foundation/Blender 4.5/blender.exe",
+  "workers": 4,
+  "profiles": [
+    {
+      "id": "kuro2",
+      "name": "黎之轨迹 II",
+      "game": "C:/Program Files (x86)/Steam/steamapps/common/THE LEGEND OF HEROES KURO NO KISEKI2",
+      "output": "../kuro2_export",
+      "adapter": "loose_cle",
+      "executable": "ed9.exe",
+      "model_info_root": "f/asset/common/model_info",
+      "locale": "tc",
+      "mdl_versions": [2]
+    },
+    {
+      "id": "sky2",
+      "name": "空之轨迹 the 2nd",
+      "game": "C:/Program Files (x86)/Steam/steamapps/common/Trails in the Sky 2nd Chapter",
+      "output": "../sky2_export",
+      "adapter": "falcom_pac",
+      "executable": "sora_2nd.exe",
+      "locale": "tc",
+      "mdl_versions": [4, 5]
+    }
+  ]
+}

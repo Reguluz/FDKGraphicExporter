@@ -1,0 +1,8 @@
+# Validated with Python 3.11 on Windows x64.
+numpy==1.26.4
+Pillow==10.2.0
+zstandard==0.19.0
+blowfish==0.6.1
+pyquaternion==0.9.9
+xxhash==4.0.2
+lz4==4.3.2

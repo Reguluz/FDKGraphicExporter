@@ -47,7 +47,7 @@ def check_packaging(folder):
 def check_plugin(folder):
     sys.path.insert(0, str(ROOT / 'blender_addon'))
     import kuro2_preview as addon
-    assert addon.bl_info['version'] == (1, 2, 1)
+    assert addon.bl_info['version'] == (1, 3, 0)
     assert json.loads((ROOT / 'blender_addon/kuro2_preview/library_presets.json').read_text(
         encoding='utf-8')) == {'profiles_path': '', 'profiles': []}
     original_objects = {obj.as_pointer() for obj in bpy.data.objects}

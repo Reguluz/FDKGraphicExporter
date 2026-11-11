@@ -1,8 +1,8 @@
 # FDK Blender 插件
 
-插件 **FDK 模型与材质预览**，版本 **1.2.1**，适用 **Blender 4.5 LTS**。用于浏览 FDK 资源工具已导出的模型、恢复材质连接和创建预览相机与灯光。
+插件 **FDK 模型与材质预览**，版本 **1.3.0**，适用 **Blender 4.5 LTS 和 5.2 LTS**。用于浏览 FDK 资源工具已导出的模型、恢复材质连接和创建预览相机与灯光。
 
-从 [Release 下载页](https://github.com/Reguluz/FDKGraphicExporter/releases/latest) 获取工具合集内的 `fdk_toolkit/FDK_Blender_Addon.zip`，或单独下载 `FDK_Blender_Addon-v1.2.1.zip`。安装无需编译。插件包不包含游戏模型或贴图，也不嵌入构建者的本机路径；安装后需选择自己的配置文件或资源库。完整导出流程见 [首页操作说明](https://github.com/Reguluz/FDKGraphicExporter/blob/v1.2.1/README.md)。
+从 [Release 下载页](https://github.com/Reguluz/FDKGraphicExporter/releases/latest) 获取工具合集内的 `fdk_toolkit/FDK_Blender_Addon.zip`，或单独下载 `FDK_Blender_Addon-v1.3.0.zip`。安装无需编译。插件包不包含游戏模型或贴图，也不嵌入构建者的本机路径；安装后需选择自己的配置文件或资源库。完整导出流程见 [首页操作说明](https://github.com/Reguluz/FDKGraphicExporter/blob/v1.3.0/README.md)。
 
 ## 安装与升级
 

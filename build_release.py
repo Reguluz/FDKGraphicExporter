@@ -19,12 +19,11 @@ import zipfile
 ROOT = Path(__file__).resolve().parent
 PYTHON_VERSION = '3.11.9'
 PYTHON_URL = f'https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip'
-# Published MD5 on the official 3.11.9 download page; HTTPS protects transport.
-PYTHON_MD5 = '6d9aa08531d48fcc261ba667e2df17c4'
 PYTHON_SHA256 = '009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b'
 PARSER_COMMIT = 'e2e6dbe47d6a917fafa7ba3e0eb2d57cdbcb8090'
 PARSER_FILES = ('kuro_mdl_export_meshes.py', 'kuro_mdl_to_basic_gltf.py', 'lib_fmtibvb.py')
-TOOLS = ('archive_pac.py', 'asset_config.py', 'blender_export.py', 'blender_rig_repair.py',
+BLENDER_SCRIPTS = ('blender_export.py', 'blender_rig_repair.py')
+TOOLS = ('archive_pac.py', 'asset_config.py',
          'cache_sources.py', 'export_fbx_batch.py', 'fdk_assets.py', 'fdk_backend.py',
          'fdk_runtime.py', 'profiles.py', 'script_paths.py')
 
@@ -49,6 +48,24 @@ def compile_source(source, destination, display_name):
 def copy_file(source, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
+
+
+def compile_blender_scripts(toolkit, blender52):
+    """Only these two scripts run in Blender's Python; the backend stays 3.11."""
+    for name in BLENDER_SCRIPTS:
+        compile_source(ROOT / 'fdk_toolkit/tool' / name,
+                       toolkit / 'tool/blender_py311' / Path(name).with_suffix('.pyc'),
+                       'fdk_toolkit/tool/' + name)
+    destination = toolkit / 'tool/blender_py313'
+    destination.mkdir(parents=True)
+    expression = (
+        'import bpy,sys,py_compile; from pathlib import Path; '
+        "assert bpy.app.version[:2]==(5,2) and sys.version_info[:2]==(3,13), 'Build requires official Blender 5.2 LTS'; "
+        f'sources={[(str(ROOT / "fdk_toolkit/tool" / name), str(destination / Path(name).with_suffix(".pyc")), "fdk_toolkit/tool/" + name) for name in BLENDER_SCRIPTS]!r}; '
+        '[py_compile.compile(source,cfile=target,dfile=display,doraise=True,'
+        'invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH) for source,target,display in sources]')
+    run(blender52, '--background', '--factory-startup', '--disable-autoexec',
+        '--python-exit-code', '1', '--python-expr', expression, env=portable_environment())
 
 
 def install_dependencies(folder, build_root):
@@ -99,13 +116,17 @@ def write_zip(folder, destination):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', default='1.2.1')
+    parser.add_argument('--version', default='1.3.0')
+    parser.add_argument('--blender52', required=True, type=Path,
+                        help='Official Blender 5.2 LTS blender.exe, used only to compile Python 3.13 scripts')
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
     args = parser.parse_args()
     if sys.platform != 'win32' or sys.version_info[:2] != (3, 11) or struct.calcsize('P') != 8:
         parser.error('Build with Windows x64 Python 3.11 and the repository build environment.')
     if not re.fullmatch(r'\d+\.\d+\.\d+', args.version):
         parser.error('Version must contain three numeric components.')
+    if not args.blender52.is_file():
+        parser.error('--blender52 must point to Blender 5.2 LTS blender.exe.')
     addon = ROOT / 'fdk_toolkit/blender_addon/kuro2_preview/__init__.py'
     info = next(ast.literal_eval(node.value) for node in ast.parse(addon.read_text(encoding='utf-8')).body
                 if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'bl_info' for t in node.targets))
@@ -145,6 +166,7 @@ def main():
     for name in TOOLS:
         compile_source(ROOT / 'fdk_toolkit/tool' / name, toolkit / 'tool' / Path(name).with_suffix('.pyc'),
                        'fdk_toolkit/tool/' + name)
+    compile_blender_scripts(toolkit, args.blender52.resolve())
     for name in PARSER_FILES:
         compile_source(ROOT / 'tools/kuro_mdl_tool' / name, bundle / 'tools/kuro_mdl_tool' / Path(name).with_suffix('.pyc'),
                        'tools/kuro_mdl_tool/' + name)
@@ -155,7 +177,7 @@ def main():
     copy_file(ROOT / 'README.md', bundle / 'README.md')
     copy_file(ROOT / 'LICENSE', bundle / 'LICENSE')
     copy_file(ROOT / 'requirements.txt', bundle / 'licenses/PYTHON_REQUIREMENTS.txt')
-    for name in ('COMPATIBILITY.md', 'BUILDING.md', 'RELEASE_NOTES_v1.2.1.md'):
+    for name in ('COMPATIBILITY.md', 'BUILDING.md', f'RELEASE_NOTES_v{args.version}.md'):
         if (ROOT / 'docs' / name).is_file():
             copy_file(ROOT / 'docs' / name, bundle / 'docs' / name)
     run(sys.executable, ROOT / 'fdk_toolkit/blender_addon/package_addon.py', '--output', toolkit / 'FDK_Blender_Addon.zip')
@@ -170,7 +192,8 @@ def main():
         f'SHA256: {hashlib.sha256(embedded.read_bytes()).hexdigest()}\n'
         'Python source: https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tar.xz\n'
         'Third-party wheel package licenses and metadata: licenses/python_packages/\n'
-        'Internal Python bytecode is compiled for CPython 3.11; Blender requires 4.5 LTS.\n'
+        'Backend runtime: CPython 3.11. Blender scripts: Python 3.11 / 3.13 bytecode from the same source.\n'
+        'Supported Blender branches: 4.5 LTS / 5.2 LTS; Blender is installed separately.\n'
         'The Blender add-on ZIP uses the standard installable Python add-on format.\n', encoding='utf-8')
     # Verify imports using only the embedded runtime and its own relative paths.
     run(python_dir / 'python.exe', '-X', 'utf8', '-u', '-c',

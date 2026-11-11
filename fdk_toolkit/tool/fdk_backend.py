@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 import fdk_runtime as runtime
-from script_paths import script_path
+from script_paths import script_path, blender_script_path, probe_blender
 from profiles import read_profile, validate_library, write_identity, TOOLKIT, WORKSPACE
 TOOL = TOOLKIT / 'tool'
 PYTHON = WORKSPACE / 'tools/python/Scripts/python.exe'
@@ -239,8 +239,7 @@ def preflight(profile):
     else:
         raise ValueError('此游戏的输入适配器尚未实现。')
     if profile['action'] != 'scan':
-        required += [Path(profile['blender']), script_path(TOOL / 'blender_export.py'),
-                     script_path(TOOL / 'blender_rig_repair.py'), script_path(TOOL / 'export_fbx_batch.py')]
+        required += [Path(profile['blender']), script_path(TOOL / 'export_fbx_batch.py')]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise FileNotFoundError('找不到所需文件或目录：\n' + '\n'.join(missing))
@@ -253,15 +252,19 @@ def preflight(profile):
     if dependencies.returncode:
         raise RuntimeError('导出依赖不完整：' + dependencies.stderr.strip())
     blender_version = None
+    blender_runtime = None
     if profile['action'] != 'scan':
-        result = subprocess.run([profile['blender'], '--version'], capture_output=True,
-            text=True, encoding='utf-8', errors='replace', timeout=30, creationflags=NO_WINDOW)
-        if result.returncode or not result.stdout.startswith('Blender 4.5'):
-            raise RuntimeError('请指定已经验证的 Blender 4.5 可执行文件。')
-        blender_version = result.stdout.splitlines()[0]
+        blender_runtime = probe_blender(profile['blender'])
+        blender_version = 'Blender ' + blender_runtime['blender_version']
+        for name in ('blender_export.py', 'blender_rig_repair.py'):
+            path = blender_script_path(TOOL / name, blender_runtime['python_version'])
+            if not path.is_file():
+                raise FileNotFoundError('缺少此 Blender 对应的导出脚本，请完整解压工具合集：' + str(path))
+            if path.suffix == '.pyc' and path.read_bytes()[:4].hex() != blender_runtime['bytecode_magic']:
+                raise RuntimeError('导出脚本的 Python 字节码与所选 Blender 不匹配，请使用完整官方工具合集。')
     return {'profile_id': profile['id'], 'game': profile['game'], 'output': profile['output'],
             'adapter': profile['adapter'], 'python': str(PYTHON), 'blender': blender_version,
-            'workers': profile['workers'], 'action': profile['action']}
+            'workers': profile['workers'], 'action': profile['action'], 'blender_runtime': blender_runtime}
 
 
 def asset_worker(runner, run_dir, profile, action, **values):

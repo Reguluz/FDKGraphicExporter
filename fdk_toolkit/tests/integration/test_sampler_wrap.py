@@ -4,7 +4,7 @@ import json
 import bpy
 
 ROOT = Path(__file__).resolve().parents[2]
-DEST = ROOT / 'reports/blender_preview/sampler_wrap'
+DEST = ROOT.parent / 'dist/qa_1_3/sampler_wrap' / '.'.join(map(str, bpy.app.version))
 DEST.mkdir(parents=True, exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 cases = [(value, upper, lower) for value in (1.2, 0.2, -0.2)
@@ -23,7 +23,7 @@ for index, (value, upper, lower) in enumerate(cases):
 bpy.ops.object.camera_add(location=(2.5,0,5))
 camera=bpy.context.object; camera.data.type='ORTHO'; camera.data.ortho_scale=6
 bpy.context.scene.camera=camera
-scene=bpy.context.scene; scene.render.engine='BLENDER_EEVEE_NEXT'
+scene=bpy.context.scene; scene.render.engine='BLENDER_EEVEE' if bpy.app.version >= (5,0,0) else 'BLENDER_EEVEE_NEXT'
 scene.render.resolution_x=192;scene.render.resolution_y=32;scene.render.resolution_percentage=100
 scene.view_settings.view_transform='Raw'
 scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_mode='RGB'

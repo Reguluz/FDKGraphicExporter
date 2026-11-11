@@ -2,13 +2,13 @@
 
 普通使用请从 [Release](https://github.com/Reguluz/FDKGraphicExporter/releases/latest) 下载工具合集，按 [首页操作说明](../README.md) 使用。本页面向需要修改代码、运行测试或自行构建的开发者。
 
-本页的命令和源码路径都针对下方克隆得到的源码仓库。Release 运行包不包含 `setup.ps1`、构建脚本或测试源码，不能在运行包目录中执行这些开发步骤。v1.2.1 对应源码见 [固定版本仓库](https://github.com/Reguluz/FDKGraphicExporter/tree/v1.2.1)。
+本页的命令和源码路径都针对下方克隆得到的源码仓库。Release 运行包不包含 `setup.ps1`、构建脚本或测试源码，不能在运行包目录中执行这些开发步骤。v1.3.0 对应源码见 [固定版本仓库](https://github.com/Reguluz/FDKGraphicExporter/tree/v1.3.0)。
 
 ## 准备开发环境
 
 - Windows 64 位、PowerShell 和 Git。
 - Python **3.11 64 位**，带 `venv` 和 `pip`。
-- Blender **4.5 LTS**；导出器检查 4.5 版本，原有模型流程已验证环境为 4.5.3。
+- Blender **4.5 LTS 和 5.2 LTS**，分别用于双版本验证；制作完整 Release 时需要提供 Blender 5.2 路径以编译对应字节码。
 - Windows 的 .NET Framework 4.x C# 编译器。构建脚本使用 `Microsoft.NET/Framework64/v4.0.30319/csc.exe`。
 
 测试导出功能时需自行准备受支持的游戏安装。源码仓库、Release 和测试源码均不提供游戏素材或导出结果。
@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Python 'python'
 git submodule update --init --recursive
 ```
 
-首次安装需要联网获取固定版本的上游子模块与 [Python 依赖](https://github.com/Reguluz/FDKGraphicExporter/blob/v1.2.1/requirements.txt)。`setup.ps1` 创建本地 `tools/python` 虚拟环境，安装依赖，再生成：
+首次安装需要联网获取固定版本的上游子模块与 [Python 依赖](https://github.com/Reguluz/FDKGraphicExporter/blob/v1.3.0/requirements.txt)。`setup.ps1` 创建本地 `tools/python` 虚拟环境，安装依赖，再生成：
 
 - `fdk_toolkit/FDK_Asset_Tool.exe`
 - `fdk_toolkit/FDK_Blender_Addon.zip`
@@ -59,12 +59,12 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1 -SkipInstall
 准备好上述开发环境后，在仓库根目录执行：
 
 ```powershell
-.\tools\python\Scripts\python.exe .\build_release.py --version 1.2.1
+.\tools\python\Scripts\python.exe .\build_release.py --version 1.3.0 --blender52 "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 ```
 
-脚本获取官方 CPython 3.11.9 Windows x64 嵌入式运行包和固定版本依赖，编译图形界面、工具及解析器，打包 Blender 插件，并生成发行包。内部 Python 工具以编译后的字节码提供；Blender 插件使用 Blender 正常安装的 ZIP 结构。打包不读取开发者的游戏配置或复制已有导出目录。
+脚本获取官方 CPython 3.11.9 Windows x64 嵌入式运行包和固定版本依赖，编译图形界面、工具及解析器，打包 Blender 插件，并生成发行包。内部 Python 工具以编译后的字节码提供；两个 Blender 导出脚本分别编译为 Python 3.11/3.13 字节码，启动时自动选择；Blender 插件使用 Blender 正常安装的 ZIP 结构。打包不读取开发者的游戏配置或复制已有导出目录。
 
-默认产物位于 `dist/`，可用 `--output` 指定另一个生成目录。用于发布的附件为工具合集 ZIP、单独插件 ZIP 和 `SHA256SUMS.txt`。合集解压根目录为 `FDKGraphicExporter-v1.2.1`，包含 `fdk_toolkit/`、`tools/`、说明及许可文件。
+默认产物位于 `dist/`，可用 `--output` 指定另一个生成目录。用于发布的附件为工具合集 ZIP、单独插件 ZIP 和 `SHA256SUMS.txt`。合集解压根目录为 `FDKGraphicExporter-v1.3.0`，包含 `fdk_toolkit/`、`tools/`、说明及许可文件。
 
 发行包中的 Python 运行时许可为 `licenses/Python-LICENSE.txt`，上游解析器许可为 `licenses/kuro_mdl_tool-LICENSE.txt`，Python 包许可及元数据位于 `licenses/python_packages/`。`SOURCE.txt` 指向对应源码版本和依赖来源。
 
@@ -91,7 +91,7 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1 -SkipInstall
 
 需要真实游戏的环境检查默认跳过。准备好本机配置、游戏和 Blender 后，可设置 `FDK_RUN_GAME_TESTS=1` 启用对应检查。
 
-Blender 集成脚本在 `fdk_toolkit/tests/integration/`。`test_portable_addon.py` 不需要游戏素材，可使用自己的 Blender 4.5 路径运行：
+Blender 集成脚本在 `fdk_toolkit/tests/integration/`。`test_portable_addon.py` 不需要游戏素材，应分别使用自己的 Blender 4.5、5.2 路径运行：
 
 ```powershell
 & 'C:\Program Files\Blender Foundation\Blender 4.5\blender.exe' --background --factory-startup --python-exit-code 1 --python .\fdk_toolkit\tests\integration\test_portable_addon.py

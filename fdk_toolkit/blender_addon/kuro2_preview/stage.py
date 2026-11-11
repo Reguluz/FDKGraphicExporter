@@ -1,6 +1,6 @@
 """Non-destructive, size-aware preview lighting for exported Kuro II models.
 
-Blender 4.5 API. This module only replaces objects carrying its own stage tag;
+Blender 4.5/5.2 API. This module only replaces objects carrying its own stage tag;
 imported meshes, transforms, armatures and user-owned datablocks are not edited.
 """
 from __future__ import annotations
@@ -211,7 +211,7 @@ def setup_preview(objects, model_id: str) -> dict:
         lights.append(light.name)
 
     previous_world, world = _world(scene, model_id)
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.engine = "BLENDER_EEVEE" if bpy.app.version >= (5, 0, 0) else "BLENDER_EEVEE_NEXT"
     scene.render.resolution_x = 1024
     scene.render.resolution_y = 1024
     scene.render.resolution_percentage = 100

@@ -8,20 +8,20 @@
 
 | 下载文件 | 用途 |
 |---|---|
-| `FDKGraphicExporter-v1.2.1-windows-x64.zip` | **首次使用下载这个**：已编译的图形工具、独立运行依赖、Blender 插件和使用说明 |
-| `FDK_Blender_Addon-v1.2.1.zip` | 单独的 Blender 插件；已有导出资源库时使用，也可单独升级 |
+| `FDKGraphicExporter-v1.3.0-windows-x64.zip` | **首次使用下载这个**：已编译的图形工具、独立运行依赖、Blender 插件和使用说明 |
+| `FDK_Blender_Addon-v1.3.0.zip` | 单独的 Blender 插件；已有导出资源库时使用，也可单独升级 |
 | `SHA256SUMS.txt` | 下载文件的 SHA-256 校验值 |
 
 运行工具无需安装 Python、Git 或编译器。GitHub 自动生成的 **Source code** 压缩包供开发使用，请选择上面的 Windows 工具合集。
 
-需要 **Windows 64 位、Blender 4.5 LTS** 和自行安装的受支持游戏。Blender 需另行安装，可从 [Blender 官方下载页](https://www.blender.org/releases/4-5/) 获取。工具只读取游戏目录；下载包不含游戏素材、已导出模型、贴图或个人配置。
+需要 **Windows 64 位、Blender 4.5 LTS 或 5.2 LTS** 和自行安装的受支持游戏。Blender 需另行安装，可从 [Blender 官方下载页](https://www.blender.org/download/lts/) 获取。工具只读取游戏目录；下载包不含游戏素材、已导出模型、贴图或个人配置。
 
 ## 2. 解压并设置路径
 
 1. 将工具合集**完整解压**到有写入权限、空间充足的目录。不要在压缩包中直接运行，也不要只取出 EXE。
 2. 打开解压目录中的 **`fdk_toolkit/FDK_Asset_Tool.exe`**。
 3. 在顶部选择游戏，点击「浏览…」选择该游戏的安装根目录。
-4. 选择 Blender 4.5 的 `blender.exe`，点击「保存设置」，再点击「检查环境」。
+4. 选择 Blender 4.5 或 5.2 的 `blender.exe`，点击「保存设置」，再点击「检查环境」。
 
 只需设置自己要处理的游戏。游戏路径和偏好保存在解压目录内的 `fdk_toolkit/profiles.json`，不需要手工编辑 JSON。
 
@@ -41,10 +41,12 @@
 
 每个输出根目录包含 `fbx/`、`textures/`、`materials/`、`gltf/` 和 `reports/` 等内容。请完整保留这些目录，Blender 插件需要材质记录和贴图引用。默认复用输入未变化的已完成结果，通常无需勾选重建选项。
 
+切换导出所用的 Blender 版本后，所选 FBX 会重新导出并校验；已有贴图与中间模型仍按输入是否变化复用。
+
 ## 4. 在 Blender 中预览
 
-1. 在 Blender 4.5 打开「编辑 → 偏好设置 → 插件」，从菜单选择「从磁盘安装」。
-2. 选择工具合集内的 **`fdk_toolkit/FDK_Blender_Addon.zip`**，或单独下载的 **`FDK_Blender_Addon-v1.2.1.zip`**，无需解压插件 ZIP。
+1. 在 Blender 4.5 或 5.2 打开「编辑 → 偏好设置 → 插件」，从菜单选择「从磁盘安装」。
+2. 选择工具合集内的 **`fdk_toolkit/FDK_Blender_Addon.zip`**，或单独下载的 **`FDK_Blender_Addon-v1.3.0.zip`**，无需解压插件 ZIP。
 3. 启用 **FDK 模型与材质预览**。在插件偏好中，将「游戏配置文件」指向刚才解压目录内的 `fdk_toolkit/profiles.json`，保存偏好设置。
 4. 在 3D 视图按 **N → FDK**，选择游戏资源库，点击「刷新模型列表」。
 5. 选择已导出的模型，点击「导入模型并恢复材质」。插件会连接贴图并可创建预览相机、灯光。
@@ -58,7 +60,7 @@
 | 现象 | 处理方法 |
 |---|---|
 | 双击后提示缺少依赖或文件 | 重新完整解压工具合集，保留 `fdk_toolkit` 和 `tools` 的相对位置；若系统提示缺少 .NET Framework，安装或启用系统的 .NET Framework 4.x |
-| 环境检查找不到游戏或 Blender | 在窗口中重新选择游戏根目录与 Blender **4.5** 的 `blender.exe`，保存后再检查 |
+| 环境检查找不到游戏或 Blender | 在窗口中重新选择游戏根目录与 Blender **4.5 或 5.2** 的 `blender.exe`，保存后再检查 |
 | 扫描有模型，Blender 列表为空 | 扫描只建立索引；先导出所选模型，再在插件中选择正确资源库并刷新 |
 | 模型有缺图提示 | 查看导出日志和引用记录；工具保留真实缺失状态，不用相似图片替代 |
 | 切换游戏后提示资源库不匹配 | 选择该模型原本所属游戏的资源库，保持两款游戏的输出目录独立 |
@@ -70,7 +72,7 @@
 - [导出工具详细操作](fdk_toolkit/README.md)
 - [Blender 插件详细说明](fdk_toolkit/BLENDER_ADDON.md)
 - [兼容性与验证范围](docs/COMPATIBILITY.md)
-- [v1.2.1 更新说明](docs/RELEASE_NOTES_v1.2.1.md)
+- [v1.3.0 更新说明](docs/RELEASE_NOTES_v1.3.0.md)
 - [开发与源码构建](docs/BUILDING.md)
 - [第三方来源与许可证](fdk_toolkit/THIRD_PARTY.md)
 

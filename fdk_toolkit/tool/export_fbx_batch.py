@@ -16,7 +16,7 @@ def save_json(path, data):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--blender', required=True, help='Path to Blender 4.5 blender.exe')
+    parser.add_argument('--blender', required=True, help='Path to Blender 4.5 LTS or 5.2 LTS blender.exe')
     parser.add_argument('--output',type=Path,default=Path(__file__).resolve().parents[1])
     parser.add_argument('--workers',type=int,default=4)
     parser.add_argument('--manifest',type=Path)

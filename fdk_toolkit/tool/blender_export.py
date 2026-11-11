@@ -1,4 +1,4 @@
-"""Batch glTF -> FBX using Blender 4.5, with baked UV transforms and round-trip checks.
+"""Batch glTF -> FBX using Blender 4.5/5.2 LTS, with UV and round-trip checks.
 
 Run: blender --background --factory-startup --python blender_export.py --
      --manifest jobs.json --report result.json [--verify] [--preview sample.png]
@@ -147,7 +147,7 @@ def bake_uv_transforms():
 
 
 def patch_fbx_uv_sets():
-    """Blender 4.5's FBX exporter leaves UVSet unset (an upstream TODO).
+    """The tested 4.5/5.2 FBX exporters leave UVSet unset (an upstream TODO).
 
     Add this standard FBX texture property from the material's UVMap node.
     The patch is local to this Blender process, not the installed add-on.
@@ -396,6 +396,8 @@ def main():
             source = (args.manifest.resolve().parent / job["gltf"]).resolve()
             target = (args.manifest.resolve().parent / job["fbx"]).resolve()
             result.update(gltf=str(source), fbx=str(target))
+            result["blender_version"] = bpy.app.version_string
+            result["fbx_importer"] = "io_scene_fbx (legacy)"
             result["source_signature"] = {
                 str(path): {"bytes": path.stat().st_size, "mtime_ns": path.stat().st_mtime_ns}
                 for path in [source, source.with_suffix(".bin"), source.with_suffix(".metadata")]
@@ -419,6 +421,7 @@ def main():
                     and prior.get("source_signature") == result["source_signature"]
                     and prior.get("texture_signature") == result.get("texture_signature")
                     and prior.get("exporter_sha256") == exporter_hash
+                    and prior.get("blender_version") == bpy.app.version_string
                     and (not args.verify or prior.get("verification", {}).get("passed"))):
                 report["skipped_this_run"] += 1
                 print(f"KURO_FBX {index+1}/{len(jobs)} {job['id']} resumed", flush=True)

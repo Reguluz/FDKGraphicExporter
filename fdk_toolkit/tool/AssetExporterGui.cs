@@ -13,8 +13,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("FDK Asset Tool")]
 [assembly: AssemblyProduct("FDKGraphicExporter")]
-[assembly: AssemblyVersion("1.2.1.0")]
-[assembly: AssemblyFileVersion("1.2.1.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 namespace FDK {
     internal static class Program {
@@ -153,7 +153,7 @@ namespace FDK {
             paths.Controls.Add(Label("游戏目录"), 0, 1); paths.Controls.Add(game, 1, 1);
             Button browseGame = Button("浏览…", delegate { BrowseGame(); });
             paths.Controls.Add(browseGame, 2, 1);
-            paths.Controls.Add(Label("Blender 4.5"), 0, 2); paths.Controls.Add(blender, 1, 2);
+            paths.Controls.Add(Label("Blender 程序"), 0, 2); paths.Controls.Add(blender, 1, 2);
             Button browseBlender = Button("浏览…", delegate { BrowseBlender(); });
             paths.Controls.Add(browseBlender, 2, 2);
             paths.Controls.Add(Label("资源输出目录"), 0, 3);
@@ -255,7 +255,7 @@ namespace FDK {
             Label pluginTitle = Label("安装后，直接在 Blender 侧栏使用"); pluginTitle.Font = new Font(Font.FontFamily, 13, FontStyle.Bold);
             pluginArea.Controls.Add(pluginTitle);
             pluginArea.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(970, 0), Margin = new Padding(0, 12, 0, 14),
-                Text = "1. 打开 Blender 4.5，进入 编辑 → 偏好设置 → 插件。\n\n" +
+                Text = "1. 打开 Blender 4.5 或 5.2，进入 编辑 → 偏好设置 → 插件。\n\n" +
                 "2. 从右上角菜单选择 从磁盘安装（Install from Disk），选择本目录的 FDK_Blender_Addon.zip。\n\n" +
                 "3. 启用 FDK 模型与材质预览，在插件偏好中选择资源目录并保存偏好。\n\n" +
                 "4. 回到 3D 视图，按 N → FDK，刷新列表、选择模型，再点击 导入模型并恢复材质。" });
@@ -454,7 +454,7 @@ namespace FDK {
                 if (dialog.ShowDialog(this) == DialogResult.OK) game.Text = dialog.SelectedPath;
         }
         void BrowseBlender() {
-            using (OpenFileDialog dialog = new OpenFileDialog { Title = "选择 Blender 4.5", Filter = "Blender 程序|blender.exe|程序文件|*.exe", FileName = blender.Text })
+            using (OpenFileDialog dialog = new OpenFileDialog { Title = "选择 Blender 4.5 LTS 或 5.2 LTS", Filter = "Blender 程序|blender.exe|程序文件|*.exe", FileName = blender.Text })
                 if (dialog.ShowDialog(this) == DialogResult.OK) blender.Text = dialog.FileName;
         }
         void SetBusy(bool value) {
@@ -669,7 +669,7 @@ namespace FDK {
                 if (Directory.Exists(Value(checkRequest, "output"))) throw new Exception("Check-only probe created an output library");
             } finally { if (File.Exists(requestPath)) File.Delete(requestPath); }
             if (!File.ReadAllBytes(Path.Combine(root, "profiles.json")).SequenceEqual(originalConfig)) throw new Exception("Portable check modified configuration");
-            WriteJson(reportPath, new { passed = true, version = "1.2.1", executable_root = root, backend = BackendPath,
+            WriteJson(reportPath, new { passed = true, version = "1.3.0", executable_root = root, backend = BackendPath,
                 profiles_checked = profiles.Items.Cast<ProfileRow>().Select(p => p.Id).ToArray(),
                 dependencies = imports, entry_point = entry, missing_game_preflight = preflight,
                 tests = new string[] { "hidden_gui_startup", "profile_output_isolation", "relative_paths", "busy_controls",

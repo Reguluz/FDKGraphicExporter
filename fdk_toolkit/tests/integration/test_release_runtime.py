@@ -31,8 +31,55 @@ def create_scene(destination):
     model.vertex_groups.new(name='tip').add([2], 1.0, 'REPLACE')
     model.modifiers.new(name='Skin', type='ARMATURE').object = armature
     model.parent = armature
+    for name, values in [('UVPrimary', ((0, 0), (1, 0), (0.5, 1))),
+                         ('UVSecondary', ((0.2, 0.1), (0.8, 0.1), (0.4, 0.9)))]:
+        layer = mesh.uv_layers.new(name=name)
+        for loop, value in zip(layer.data, values):
+            loop.uv = value
+    material = bpy.data.materials.new('SyntheticMaterial')
+    material.use_nodes = True
+    model.data.materials.append(material)
+    nodes, links = material.node_tree.nodes, material.node_tree.links
+    principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
+    for role, color, uv_name in [('color', (0.3, 0.6, 0.9, 1), 'UVSecondary'),
+                                 ('normal', (0.5, 0.5, 1, 1), 'UVPrimary')]:
+        image = bpy.data.images.new('synthetic_' + role, width=4, height=4)
+        image.generated_color = color
+        image.filepath_raw = str(destination.parent / ('synthetic_' + role + '.png'))
+        image.file_format = 'PNG'
+        image.save()
+        texture = nodes.new('ShaderNodeTexImage'); texture.image = image
+        uv = nodes.new('ShaderNodeUVMap'); uv.uv_map = uv_name
+        if role == 'color':
+            mapping = nodes.new('ShaderNodeMapping')
+            mapping.inputs['Location'].default_value = (0.1, 0.2, 0)
+            mapping.inputs['Scale'].default_value = (0.5, 0.75, 1)
+            links.new(uv.outputs['UV'], mapping.inputs['Vector'])
+            links.new(mapping.outputs['Vector'], texture.inputs['Vector'])
+            links.new(texture.outputs['Color'], principled.inputs['Base Color'])
+        else:
+            image.colorspace_settings.name = 'Non-Color'
+            normal = nodes.new('ShaderNodeNormalMap'); normal.uv_map = uv_name
+            links.new(uv.outputs['UV'], texture.inputs['Vector'])
+            links.new(texture.outputs['Color'], normal.inputs['Color'])
+            links.new(normal.outputs['Normal'], principled.inputs['Normal'])
     bpy.ops.export_scene.gltf(filepath=str(destination), export_format='GLTF_SEPARATE',
                               export_animations=False, export_skins=True, export_yup=True)
+
+
+def check_fbx_uv_sets(path, expected):
+    from io_scene_fbx import parse_fbx as parse
+    root, _version = parse.parse(str(path))
+    names = set()
+    def walk(element):
+        if element.id == b'P' and element.props and element.props[0] == b'UVSet':
+            value = element.props[-1]
+            names.add(value.decode('utf-8') if isinstance(value, bytes) else value)
+        for child in element.elems:
+            walk(child)
+    walk(root)
+    assert set(expected) <= names, (expected, names)
+    print('Explicit FBX UVSet properties:', sorted(names))
 
 
 def run(*args, **kwargs):
@@ -79,6 +126,16 @@ def main():
         record = summary['jobs'][0]
         assert record['before']['bones'] == 2 and record['before']['triangles'] == 1, record
         assert record['verification']['passed'] and (output / 'fbx/synthetic.fbx').is_file(), record
+        assert len(record['before']['texture_bindings']) == 2, record
+        assert record['uv_bake']['mapping_nodes_baked'] >= 1, record
+        expected = sorted({name for binding in record['before']['texture_bindings'] for name in binding['uv_sets']})
+        # glTF's UV0 may use the unlinked/default texture coordinate. The
+        # second UV set is explicitly named and must survive as FBX UVSet.
+        assert expected and record['before']['uv_loop_count'] == 6, record
+        expression = (f"import runpy; module=runpy.run_path({str(Path(__file__).resolve())!r}); "
+                      f"module['check_fbx_uv_sets']({str(output / 'fbx/synthetic.fbx')!r},{expected!r})")
+        print(run(args.blender, '--background', '--factory-startup', '--python-exit-code', '1',
+                  '--python-expr', expression, cwd=work, env=env).stdout.strip())
         # Exercise Windows spawn/import and DDS-to-PNG through the actual worker.
         texture_script = (
             "from pathlib import Path; from PIL import Image; from concurrent.futures import ProcessPoolExecutor; "
@@ -96,11 +153,12 @@ def main():
         print(worker.stdout.strip())
         # The rarely used repair entry point must also load the compiled exporter.
         empty = work / 'empty.json'; empty.write_text('{"jobs":[]}', encoding='utf-8')
-        repair = bundle / 'fdk_toolkit/tool/blender_rig_repair.pyc'
-        run(args.blender, '--background', '--factory-startup', '--python-exit-code', '1',
-            '--python-expr', f"import runpy; runpy.run_path({str(repair)!r},run_name='__main__')",
+        sys.path.insert(0, str(repository / 'fdk_toolkit/tool'))
+        from script_paths import blender_script_args
+        repair = bundle / 'fdk_toolkit/tool/blender_rig_repair.py'
+        run(args.blender, '--background', '--factory-startup', *blender_script_args(repair),
             '--', '--manifest', empty, '--report', work / 'repair.json', '--verify', cwd=work, env=env)
-        print('FDK_RELEASE_RUNTIME_OK: relocated Unicode/space path, bytecode workers, 2-bone FBX round-trip')
+        print('FDK_RELEASE_RUNTIME_OK: Unicode/space path, bytecode workers, 2-bone textured FBX, UV transforms/sets')
 
 
 if __name__ == '__main__':

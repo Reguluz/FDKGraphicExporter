@@ -1,7 +1,7 @@
 """FDK exported-asset browser; retain legacy module/property IDs for saved scenes."""
 bl_info = {
     'name': 'FDK 模型与材质预览', 'author': 'Local asset tools',
-    'version': (1, 2, 1), 'blender': (4, 5, 0),
+    'version': (1, 3, 0), 'blender': (4, 5, 0),
     'location': '3D View > Sidebar > FDK',
     'description': 'Browse exported FBX assets, reconstruct material references and create a preview stage',
     'category': 'Import-Export',
@@ -133,7 +133,9 @@ def addon_preferences(context=None):
 
 def get_asset_root(settings):
     """Unsaved scenes inherit the installed add-on's persistent directory."""
-    override = settings.get('asset_root', '')
+    # Keep our backing value separate from the RNA property storage (5.x).
+    # Old scenes can still supply their pre-1.3 custom property.
+    override = settings.get('_fdk_asset_root', settings.get('asset_root', ''))
     if override:
         return override
     preferences = addon_preferences()
@@ -142,7 +144,7 @@ def get_asset_root(settings):
 
 def set_asset_root(settings, value):
     changed = value != get_asset_root(settings)
-    settings['asset_root'] = value
+    settings['_fdk_asset_root'] = value
     if changed:
         settings.catalog.clear()
         settings.active_index = 0

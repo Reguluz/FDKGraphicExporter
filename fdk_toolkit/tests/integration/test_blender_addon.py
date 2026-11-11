@@ -55,7 +55,7 @@ def inside(phase, run):
         assert bpy.ops.preferences.addon_install(filepath=str(ROOT / 'FDK_Blender_Addon.zip'), overwrite=True) == {'FINISHED'}
         assert bpy.ops.preferences.addon_enable(module='kuro2_preview') == {'FINISHED'}
     import kuro2_preview as addon
-    assert addon.bl_info['version'] == (1,2,0)
+    assert addon.bl_info['version'] == (1,3,0)
     assert addon.materials._is_shadow_helper({'material_name':'shadow','material_switches':[{'material_switch_name':'SWITCH_SHADOWONLY','int2':-1}]})
     assert not addon.materials._is_shadow_helper({'material_name':'shadow','material_switches':[{'material_switch_name':'SWITCH_SHADOWONLY','int2':0}]})
     assert not addon.materials._is_shadow_helper({'material_name':'shadow'})
@@ -220,9 +220,9 @@ def inside(phase, run):
         settings.material_mode = 'PRINCIPLED'
         assert bpy.ops.kuro2.rebuild_materials() == {'FINISHED'}
         assert sentinel.name in bpy.context.scene.objects
-        # Presets remain available even after toolkit configuration is relocated.
+        # A public ZIP must not invent local libraries when configuration is missing.
         prefs.library_config = str(run / 'missing_profiles.json')
-        assert {r['id'] for r in addon.library_records()} == {'kuro2','sky2'}
+        assert addon.library_records() == []  # Public packages carry no personal fallback libraries.
         prefs.library_config = str(ROOT / 'profiles.json')
         assert bpy.ops.kuro2.save_default_root() == {'FINISHED'}
         report = {'passed':True,'phase':phase,'version':addon.bl_info['version'],'language':'zh_HANS',

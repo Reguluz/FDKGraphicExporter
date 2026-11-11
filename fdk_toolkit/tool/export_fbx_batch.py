@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from script_paths import script_path, blender_script_args
 
 def save_json(path, data):
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -32,7 +33,7 @@ def main():
     excluded=set()
     if args.exclude_audit:
         excluded={item['model'] for item in json.loads(args.exclude_audit.read_text(encoding='utf-8'))}
-    script=Path(__file__).with_name('blender_export.py').resolve()
+    script=script_path(Path(__file__).with_name('blender_export.py')).resolve()
 
     def partition(job):
         return int(hashlib.sha256(job['id'].encode()).hexdigest()[:16],16)%args.workers
@@ -54,7 +55,7 @@ def main():
         report=reports/f'{tag}_fbx.json'
         assigned=[job for job in jobs if partition(job)==index]
         save_json(manifest,{'jobs':assigned})
-        command=[args.blender,'--background','--factory-startup','--threads','2','--python',str(script),'--',
+        command=[args.blender,'--background','--factory-startup','--threads','2',*blender_script_args(script),'--',
                  '--manifest',str(manifest),'--report',str(report),'--verify','--resume']
         with (reports/f'{tag}.log').open('a',encoding='utf-8') as log:
             log.write(f'\n--- Round {time.strftime("%Y-%m-%d %H:%M:%S")} requested={len(assigned)} ---\n')
@@ -71,7 +72,7 @@ def main():
                     repair_report=reports/f'{tag}_rig_repair.json'
                     save_json(repair_manifest,{'jobs':[j for j in assigned if j['id'] in nested_ids]})
                     repair_command=[args.blender,'--background','--factory-startup','--threads','2',
-                                    '--python',str(script.with_name('blender_rig_repair.py')),'--',
+                                    *blender_script_args(script.with_name('blender_rig_repair.py')),'--',
                                     '--manifest',str(repair_manifest),'--report',str(repair_report),'--verify']
                     repair_process=subprocess.run(repair_command,stdout=log,stderr=subprocess.STDOUT,
                                                   creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))

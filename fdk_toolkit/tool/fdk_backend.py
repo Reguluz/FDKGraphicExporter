@@ -15,11 +15,17 @@ import sys
 import threading
 import time
 import fdk_runtime as runtime
+from script_paths import script_path
 from profiles import read_profile, validate_library, write_identity, TOOLKIT, WORKSPACE
 TOOL = TOOLKIT / 'tool'
 PYTHON = WORKSPACE / 'tools/python/Scripts/python.exe'
 OUTPUT = REPORTS = None
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+
+
+def python_command(*arguments):
+    # Embeddable ._pth isolation ignores PYTHONUTF8/PYTHONIOENCODING env vars.
+    return [PYTHON, '-X', 'utf8', '-u', *arguments]
 
 class Cancelled(Exception):
     pass
@@ -221,8 +227,8 @@ def configure(profile):
 def preflight(profile):
     validate_library(profile)
     game = Path(profile['game'])
-    required = [game / profile['executable'], PYTHON, TOOL / 'fdk_assets.py',
-                WORKSPACE / 'tools/kuro_mdl_tool/kuro_mdl_export_meshes.py']
+    required = [game / profile['executable'], PYTHON, script_path(TOOL / 'fdk_assets.py'),
+                script_path(WORKSPACE / 'tools/kuro_mdl_tool/kuro_mdl_export_meshes.py')]
     if profile['adapter'] == 'loose_cle':
         required += [game / 'c/asset/common/model', game / 'c/asset/dx11/image']
     elif profile['adapter'] == 'falcom_pac':
@@ -233,15 +239,15 @@ def preflight(profile):
     else:
         raise ValueError('此游戏的输入适配器尚未实现。')
     if profile['action'] != 'scan':
-        required += [Path(profile['blender']), TOOL / 'blender_export.py',
-                     TOOL / 'blender_rig_repair.py', TOOL / 'export_fbx_batch.py']
+        required += [Path(profile['blender']), script_path(TOOL / 'blender_export.py'),
+                     script_path(TOOL / 'blender_rig_repair.py'), script_path(TOOL / 'export_fbx_batch.py')]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise FileNotFoundError('找不到所需文件或目录：\n' + '\n'.join(missing))
     if Path(sys.executable).resolve() != PYTHON.resolve():
         raise ValueError('请从 FDK 图形工具启动，以使用工作区 Python 环境。')
-    dependencies = subprocess.run([str(PYTHON), '-c',
-        'import numpy,PIL,zstandard,blowfish,xxhash,pyquaternion,lz4.frame'],
+    dependencies = subprocess.run(python_command('-c',
+        'import numpy,PIL,zstandard,blowfish,xxhash,pyquaternion,lz4.frame'),
         env=runtime.environment(), capture_output=True, text=True, encoding='utf-8',
         errors='replace', timeout=30, creationflags=NO_WINDOW)
     if dependencies.returncode:
@@ -261,7 +267,7 @@ def preflight(profile):
 def asset_worker(runner, run_dir, profile, action, **values):
     request = run_dir / f'{action}_request.json'
     save_json(request, {'action': action, 'profile': profile, **values})
-    return runner.command([PYTHON, TOOL / 'fdk_assets.py', '--job', request])
+    return runner.command(python_command(script_path(TOOL / 'fdk_assets.py'), '--job', request))
 
 
 def validate_inventory():
@@ -348,7 +354,7 @@ def execute(profile, run_dir, runner):
         recovery_request = run_dir / 'recovery_request.json'
         save_json(recovery_request, {'profile': profile, 'ids': ids,
                                     'backup': str(run_dir / 'incomplete_cache'), 'report': str(run_dir / 'cache_recovery.json')})
-        runner.command([PYTHON, TOOL / 'fdk_backend.py', '--recover-worker', recovery_request])
+        runner.command(python_command(script_path(TOOL / 'fdk_backend.py'), '--recover-worker', recovery_request))
     prepare_tag = 'all' if complete else (run_dir.relative_to(REPORTS) / 'prepared').as_posix()
     runner.phase(1, f'转换 {len(ids)} 个模型与引用贴图')
     asset_worker(runner, run_dir, profile, 'prepare', ids=ids, tag=prepare_tag, overwrite=overwrite)
@@ -360,9 +366,9 @@ def execute(profile, run_dir, runner):
     batch_tag = 'batch' if complete else f'gui_exports/batch_{workers}'
     prior = seed_resume_records(ids, workers, batch_tag)
     try:
-        runner.command([PYTHON, TOOL / 'export_fbx_batch.py', '--blender', profile['blender'],
+        runner.command(python_command(script_path(TOOL / 'export_fbx_batch.py'), '--blender', profile['blender'],
                         '--output', OUTPUT, '--workers', workers, '--manifest',
-                        REPORTS / f'{prepare_tag}_jobs.json', '--tag', batch_tag])
+                        REPORTS / f'{prepare_tag}_jobs.json', '--tag', batch_tag))
     finally:
         merge_resume_cache(prior, workers, batch_tag)
     runner.phase(4, '检查文件并生成校验目录')
@@ -389,7 +395,7 @@ def main():
         emit('status', f'正在检查 {profile["name"]} 的路径与工具环境。')
         # Preflight itself is a child Job so Cancel also interrupts version checks.
         runner = Runner(io.StringIO(), args.cancel_file)
-        lines = runner.command([PYTHON, TOOL / 'fdk_backend.py', '--preflight-worker', args.request.resolve()])
+        lines = runner.command(python_command(script_path(TOOL / 'fdk_backend.py'), '--preflight-worker', args.request.resolve()))
         check = json.loads(lines[-1])
         runner.check_cancel()
         if args.check_only:

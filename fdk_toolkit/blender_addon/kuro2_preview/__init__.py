@@ -1,7 +1,7 @@
 """FDK exported-asset browser; retain legacy module/property IDs for saved scenes."""
 bl_info = {
     'name': 'FDK 模型与材质预览', 'author': 'Local asset tools',
-    'version': (1, 2, 0), 'blender': (4, 5, 0),
+    'version': (1, 2, 1), 'blender': (4, 5, 0),
     'location': '3D View > Sidebar > FDK',
     'description': 'Browse exported FBX assets, reconstruct material references and create a preview stage',
     'category': 'Import-Export',

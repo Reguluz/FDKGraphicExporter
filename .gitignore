@@ -56,3 +56,4 @@ __pycache__/
 *.pdb
 *.zip
 *.7z
+/dist/

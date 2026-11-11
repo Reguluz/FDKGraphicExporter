@@ -5,10 +5,16 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
+
+[assembly: AssemblyTitle("FDK Asset Tool")]
+[assembly: AssemblyProduct("FDKGraphicExporter")]
+[assembly: AssemblyVersion("1.2.1.0")]
+[assembly: AssemblyFileVersion("1.2.1.0")]
 
 namespace FDK {
     internal static class Program {
@@ -21,11 +27,12 @@ namespace FDK {
                 using (ExporterForm form = new ExporterForm(root)) {
                     if (args.Length == 2 && args[0] == "--self-test") return form.SelfTest(args[1]);
                     if (args.Length == 2 && args[0] == "--integration-test") return form.IntegrationTest(args[1]);
+                    if (args.Length == 2 && args[0] == "--portable-test") return form.PortableTest(args[1]);
                     Application.Run(form);
                 }
                 return 0;
             } catch (Exception ex) {
-                if (args.Contains("--self-test") || args.Contains("--integration-test")) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args.Last()))); File.WriteAllText(args.Last() + ".error.txt", ex.ToString()); return 1; }
+                if (args.Contains("--self-test") || args.Contains("--integration-test") || args.Contains("--portable-test")) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args.Last()))); File.WriteAllText(args.Last() + ".error.txt", ex.ToString()); return 1; }
                 MessageBox.Show(ex.Message, "资源工具启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }
@@ -54,6 +61,13 @@ namespace FDK {
         ProfileRow currentProfile;
         readonly Dictionary<string, Dictionary<string, object>> profileStates = new Dictionary<string, Dictionary<string, object>>();
         string OutputRoot { get { return currentProfile == null ? root : ConfigPath(Value(currentProfile.Data, "output")); } }
+        string PythonPath { get { return Path.GetFullPath(Path.Combine(root, "..", "tools", "python", "Scripts", "python.exe")); } }
+        string BackendPath {
+            get {
+                string source = Path.Combine(root, "tool", "fdk_backend.py");
+                return File.Exists(source) ? source : source + "c";
+            }
+        }
         ComboBox family;
         NumericUpDown workers;
         CheckBox rescan, rebuild;
@@ -451,8 +465,8 @@ namespace FDK {
             if (busy) return;
             try {
                 if (!checkOnly && action == "export" && !allModels.Checked && selected.Count == 0) throw new InvalidOperationException("请先勾选至少一个模型，或选择全部模型。");
-                string python = Path.GetFullPath(Path.Combine(root, "..", "tools", "python", "Scripts", "python.exe"));
-                string backend = Path.Combine(root, "tool", "fdk_backend.py");
+                string python = PythonPath;
+                string backend = BackendPath;
                 if (!File.Exists(python) || !File.Exists(backend)) throw new FileNotFoundException("工具文件不完整。请保持 fdk_toolkit 与 tools 目录相邻，并保留 tool 文件夹。");
                 string run = Path.Combine(root, "reports", "gui_runs", DateTime.Now.ToString("yyyyMMdd_HHmmss_fff"));
                 Directory.CreateDirectory(run);
@@ -462,12 +476,13 @@ namespace FDK {
                 SaveSettings();
                 log.Clear(); progress.Value = 0; checking = checkOnly; doneReceived = false; doneStatus = null; lastError = null;
                 phase.Text = checkOnly ? "正在检查路径和依赖…" : action == "scan" ? "正在扫描模型目录…" : "准备导出…";
-                ProcessStartInfo info = new ProcessStartInfo(python, Q(backend) + " --request " + Q(request) + " --cancel-file " + Q(cancelFile) + (checkOnly ? " --check-only" : ""));
+                ProcessStartInfo info = new ProcessStartInfo(python, "-X utf8 -u " + Q(backend) + " --request " + Q(request) + " --cancel-file " + Q(cancelFile) + (checkOnly ? " --check-only" : ""));
                 info.WorkingDirectory = root; info.UseShellExecute = false; info.CreateNoWindow = true;
                 info.RedirectStandardOutput = true; info.RedirectStandardError = true;
                 info.StandardOutputEncoding = Encoding.UTF8; info.StandardErrorEncoding = Encoding.UTF8;
                 info.EnvironmentVariables["PYTHONUTF8"] = "1"; info.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
                 info.EnvironmentVariables["PYTHONUNBUFFERED"] = "1";
+                info.EnvironmentVariables.Remove("PYTHONHOME"); info.EnvironmentVariables.Remove("PYTHONPATH");
                 process = new Process { StartInfo = info, EnableRaisingEvents = true };
                 Process active = process;
                 process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) Post(delegate { Consume(e.Data); }); };
@@ -587,6 +602,79 @@ namespace FDK {
                 s.Append('\\', slashes); slashes = 0; s.Append(c);
             }
             s.Append('\\', slashes * 2); s.Append('"'); return s.ToString();
+        }
+        Dictionary<string, object> PortableProbe(string arguments, int expectedExit) {
+            ProcessStartInfo info = new ProcessStartInfo(PythonPath, "-X utf8 -u " + arguments) {
+                WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+            };
+            info.EnvironmentVariables.Remove("PYTHONHOME"); info.EnvironmentVariables.Remove("PYTHONPATH");
+            info.EnvironmentVariables["PYTHONUTF8"] = "1"; info.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            StringBuilder output = new StringBuilder(), error = new StringBuilder();
+            using (NativeJob owner = new NativeJob())
+            using (Process probe = new Process { StartInfo = info }) {
+                probe.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) output.AppendLine(e.Data); };
+                probe.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) error.AppendLine(e.Data); };
+                probe.Start();
+                try { owner.Attach(probe); } catch { probe.Kill(); throw; }
+                probe.BeginOutputReadLine(); probe.BeginErrorReadLine();
+                if (!probe.WaitForExit(30000)) throw new TimeoutException("Portable runtime probe timed out");
+                probe.WaitForExit();
+                if (probe.ExitCode != expectedExit) throw new Exception("Portable runtime probe failed: " + output + error);
+                return new Dictionary<string, object> { { "exit_code", probe.ExitCode }, { "stdout", output.ToString() }, { "stderr", error.ToString() } };
+            }
+        }
+        public int PortableTest(string reportPath) {
+            // No game assets, export or preference writes. Run against an unpacked release copy.
+            ShowInTaskbar = false; Opacity = 0; Show(); Application.DoEvents(); PerformLayout();
+            reportPath = Path.GetFullPath(reportPath);
+            string destination = Path.GetDirectoryName(reportPath);
+            Directory.CreateDirectory(destination);
+            if (profiles.Items.Count < 2) throw new Exception("Expected the two supported game profiles");
+            if (!File.Exists(PythonPath) || !File.Exists(BackendPath)) throw new FileNotFoundException("Portable runtime or backend is missing");
+            byte[] originalConfig = File.ReadAllBytes(Path.Combine(root, "profiles.json"));
+            HashSet<string> outputs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ProfileRow profile in profiles.Items) {
+                profiles.SelectedItem = profile;
+                Dictionary<string, object> request = Request(true, "scan");
+                if (Value(request, "profile_id") != profile.Id || !outputs.Add(OutputRoot)) throw new Exception("Profile output isolation failed");
+                if (!Path.IsPathRooted(Value(request, "game")) || !Path.IsPathRooted(OutputRoot)) throw new Exception("Relative configuration resolution failed");
+            }
+            SetBusy(true);
+            if (check.Enabled || profiles.Enabled || !cancel.Enabled) throw new Exception("Busy controls are inconsistent");
+            SetBusy(false);
+            Dictionary<string, object> entry = PortableProbe(Q(BackendPath) + " --help", 0);
+            if (!Value(entry, "stdout").Contains("--check-only")) throw new Exception("Backend entry point did not respond");
+            string code = "import sys; sys.path.insert(0, " + json.Serialize(Path.Combine(root, "tool")) + "); " +
+                "import json,numpy,PIL,zstandard,blowfish,xxhash,pyquaternion,lz4.frame,fdk_assets,fdk_backend; " +
+                "assert sys.flags.utf8_mode == 1; " +
+                "print(json.dumps({'python':sys.version.split()[0], 'utf8_mode':sys.flags.utf8_mode, 'runtime':sys.executable, 'backend':fdk_backend.__file__}))";
+            Dictionary<string, object> imports = PortableProbe("-c " + Q(code), 0);
+            string requestPath = Path.Combine(destination, "portable-request-" + Guid.NewGuid().ToString("N") + ".json");
+            string missingGame = Path.Combine(destination, "missing-game-" + Guid.NewGuid().ToString("N"));
+            Dictionary<string, object> preflight;
+            profiles.SelectedItem = profiles.Items.Cast<ProfileRow>().Single(p => p.Id == "kuro2");
+            Dictionary<string, object> checkRequest = Request(true, "scan");
+            checkRequest["game"] = missingGame;
+            checkRequest["output"] = Path.Combine(root, "reports", "portable-empty-" + Guid.NewGuid().ToString("N"));
+            try {
+                WriteJson(requestPath, checkRequest);
+                preflight = PortableProbe(Q(BackendPath) + " --request " + Q(requestPath) + " --check-only", 1);
+                Dictionary<string, object>[] events = Value(preflight, "stdout").Split(new string[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => json.Deserialize<Dictionary<string, object>>(line)).ToArray();
+                Dictionary<string, object> done = events.Last();
+                if (Value(done, "type") != "done" || Flag(done, "success") || Value(done, "status") != "failed" ||
+                    !Value(done, "message").Contains(missingGame)) throw new Exception("Backend did not reject the synthetic missing game as expected");
+                if (Directory.Exists(Value(checkRequest, "output"))) throw new Exception("Check-only probe created an output library");
+            } finally { if (File.Exists(requestPath)) File.Delete(requestPath); }
+            if (!File.ReadAllBytes(Path.Combine(root, "profiles.json")).SequenceEqual(originalConfig)) throw new Exception("Portable check modified configuration");
+            WriteJson(reportPath, new { passed = true, version = "1.2.1", executable_root = root, backend = BackendPath,
+                profiles_checked = profiles.Items.Cast<ProfileRow>().Select(p => p.Id).ToArray(),
+                dependencies = imports, entry_point = entry, missing_game_preflight = preflight,
+                tests = new string[] { "hidden_gui_startup", "profile_output_isolation", "relative_paths", "busy_controls",
+                    "backend_entry_point", "runtime_imports", "preflight_child_process", "check_only_does_not_export", "configuration_unchanged" } });
+            return 0;
         }
         public int SelfTest(string reportPath) {
             // Exercise the actual form/controller without changing user configuration or running an export.
